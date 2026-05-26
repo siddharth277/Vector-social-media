@@ -810,9 +810,29 @@ export const blockUser = async (req, res) => {
             { $pull: { likes: targetUserId } }
         );
 
+        // Remove bookmarks between the two users
+        const [currentUserPosts, targetUserPosts] = await Promise.all([
+            Post.find({ author: currentUserId }).select("_id").lean(),
+            Post.find({ author: targetUserId }).select("_id").lean(),
+        ]);
+        const currentUserPostIds = currentUserPosts.map(p => p._id);
+        const targetUserPostIds = targetUserPosts.map(p => p._id);
+        await Promise.all([
+            User.updateOne(
+                { _id: currentUserId },
+                { $pull: { bookmarks: { $in: targetUserPostIds } } }
+            ),
+            User.updateOne(
+                { _id: targetUserId },
+                { $pull: { bookmarks: { $in: currentUserPostIds } } }
+            ),
+        ]);
+
         const io = getIO();
         io.to(currentUserId).emit("user:blocked", { blockedUserId: targetUserId, blockerId: currentUserId });
         io.to(targetUserId).emit("user:blocked", { blockedUserId: currentUserId, blockerId: currentUserId });
+        io.to(currentUserId).emit("bookmarks:invalidated", { userId: targetUserId });
+        io.to(targetUserId).emit("bookmarks:invalidated", { userId: currentUserId });
 
         return res.json({
             success: true,

@@ -804,6 +804,29 @@ export const toggleBookmark = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
     const isBookmarked = user.bookmarks.includes(id);
+
+    // Only enforce block/privacy checks when adding a new bookmark (removal is always allowed)
+    if (!isBookmarked && post.author.toString() !== userId) {
+      const [postAuthor, currentUser] = await Promise.all([
+        User.findById(post.author).select("blockedUsers isPrivate followers"),
+        User.findById(userId).select("blockedUsers"),
+      ]);
+      const isBlocked = currentUser?.blockedUsers?.some(
+        id => id.toString() === post.author.toString()
+      ) || postAuthor?.blockedUsers?.some(
+        id => id.toString() === userId
+      );
+      if (isBlocked) {
+        return res.status(403).json({ success: false, message: "Action forbidden due to block status" });
+      }
+      if (postAuthor?.isPrivate) {
+        const isFollower = postAuthor.followers?.some(id => id.toString() === userId);
+        if (!isFollower) {
+          return res.status(403).json({ success: false, message: "This account is private. Follow to bookmark posts." });
+        }
+      }
+    }
+
     if (isBookmarked) {
       user.bookmarks.pull(id);
     } else {
@@ -852,7 +875,30 @@ export const getBookmarks = async (req, res) => {
     const orderedPosts = bookmarkIds
       .map((id) => postMap.get(id.toString()))
       .filter(Boolean);
-    const postsWithMeta = orderedPosts.map((p) => ({
+
+    const currentUserId = req.user._id?.toString() || req.user.id?.toString();
+    const blockedIds = new Set((req.user.blockedUsers || []).map(id => id.toString()));
+    const blockerDocs = await User.find({ blockedUsers: currentUserId }).select("_id").lean();
+    blockerDocs.forEach(u => blockedIds.add(u._id.toString()));
+
+    const followingIds = new Set((req.user.following || []).map(id => id.toString()));
+
+    const authorIds = [...new Set(orderedPosts.map(p => p.author?._id?.toString()).filter(Boolean))];
+    const privateNotFollowed = await User.find({
+      _id: { $in: authorIds, $nin: [...followingIds, currentUserId] },
+      isPrivate: true,
+    }).select("_id").lean();
+    const privateNotFollowedIds = new Set(privateNotFollowed.map(u => u._id.toString()));
+
+    const filteredPosts = orderedPosts.filter(p => {
+      const authorId = p.author?._id?.toString();
+      if (!authorId) return false;
+      if (blockedIds.has(authorId)) return false;
+      if (privateNotFollowedIds.has(authorId)) return false;
+      return true;
+    });
+
+    const postsWithMeta = filteredPosts.map((p) => ({
       ...p,
       isBookmarked: true,
     }));

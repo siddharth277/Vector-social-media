@@ -148,9 +148,17 @@ export function AppContextProvider({
       });
     };
 
+    const onBookmarksInvalidated = (data: { userId: string }) => {
+      setPosts((prev) => prev.filter((p) => {
+        const authorId = typeof p.author === "string" ? p.author : p.author?._id;
+        return authorId !== data.userId;
+      }));
+    };
+
     socket.on("connect", onConnect);
     socket.on("user:blocked", onBlocked);
     socket.on("user:unblocked", onUnblocked);
+    socket.on("bookmarks:invalidated", onBookmarksInvalidated);
 
     socket.emit("register", userData.id);
 
@@ -158,6 +166,7 @@ export function AppContextProvider({
       socket.off("connect", onConnect);
       socket.off("user:blocked", onBlocked);
       socket.off("user:unblocked", onUnblocked);
+      socket.off("bookmarks:invalidated", onBookmarksInvalidated);
       socket.disconnect();
     };
   }, [userData?.id]);
