@@ -2,6 +2,8 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
+import mongoose from "mongoose";
+import Conversation from "../models/conversation.model.js";
 
 let io;
 
@@ -61,12 +63,47 @@ export const initSocket = async (server) => {
         socket.join(socket.userId);
       }
     });
-    socket.on("typing", ({ conversationId, receiverId }) => {
+    socket.on("typing", async ({ conversationId, receiverId }) => {
+      try {
+        if (
+          !conversationId || !receiverId ||
+          !mongoose.Types.ObjectId.isValid(conversationId) ||
+          !mongoose.Types.ObjectId.isValid(receiverId)
+        ) return;
+
+        // Verify both socket.userId and receiverId are actual participants
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: { $all: [socket.userId, receiverId] },
+        });
+
+        if (!conversation) return;
+
         io.to(receiverId).emit("typing", { conversationId, senderId: socket.userId });
+      } catch {
+        // silently discard on unexpected error
+      }
     });
 
-    socket.on("stop_typing", ({ conversationId, receiverId }) => {
+    socket.on("stop_typing", async ({ conversationId, receiverId }) => {
+      try {
+        if (
+          !conversationId || !receiverId ||
+          !mongoose.Types.ObjectId.isValid(conversationId) ||
+          !mongoose.Types.ObjectId.isValid(receiverId)
+        ) return;
+
+        const conversation = await Conversation.findOne({
+          _id: conversationId,
+          participants: { $all: [socket.userId, receiverId] },
+        });
+
+        if (!conversation) return;
+
         io.to(receiverId).emit("stop_typing", { conversationId });
+      } catch {
+        // silently discard on unexpected error
+      }
     });
   });
 };

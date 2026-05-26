@@ -25,17 +25,39 @@ export const addComment = async (req, res) => {
             if (isBlocked) {
                 return res.status(403).json({ message: "Action forbidden due to block status" });
             }
+
+            if (authorUser?.isPrivate && currentUserId !== post.author.toString()) {
+                const isFollower = authorUser.followers?.some(
+                    id => id.toString() === currentUserId
+                );
+                if (!isFollower) {
+                    return res.status(403).json({
+                        message: "This post is from a private account. Follow them to comment.",
+                    });
+                }
+            }
         }
         // Re-verify block status right before create
         if (req.user) {
             const [freshAuthor, freshCurrent] = await Promise.all([
-                User.findById(post.author).select("blockedUsers"),
+                User.findById(post.author).select("blockedUsers followers isPrivate"),
                 User.findById(req.user.id).select("blockedUsers"),
             ]);
             const stillBlocked = freshCurrent?.blockedUsers?.some(id => id.toString() === post.author.toString()) ||
                                 freshAuthor?.blockedUsers?.some(id => id.toString() === req.user.id);
             if (stillBlocked) {
                 return res.status(403).json({ message: "Action forbidden due to block status" });
+            }
+
+            if (freshAuthor?.isPrivate && req.user.id !== post.author.toString()) {
+                const isStillFollower = freshAuthor.followers?.some(
+                    id => id.toString() === req.user.id
+                );
+                if (!isStillFollower) {
+                    return res.status(403).json({
+                        message: "This post is from a private account. Follow them to comment.",
+                    });
+                }
             }
         }
         const comment = await Comment.create({

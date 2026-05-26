@@ -14,6 +14,14 @@ jest.unstable_mockModule('../src/config/cloudinary.js', () => ({
   }
 }));
 
+jest.unstable_mockModule('../src/socket/socket.js', () => ({
+  getIO: () => ({
+    to: () => ({
+      emit: () => {},
+    }),
+  }),
+}));
+
 // Dynamic imports to ensure mocks are registered
 const { default: request } = await import('supertest');
 const { default: app } = await import('../src/app.js');
@@ -395,6 +403,56 @@ describe('Post and Comment Flows', () => {
 
       const postAfterDelete = await Post.findById(post._id);
       expect(postAfterDelete.commentsCount).toBe(0);
+    });
+
+    it('should block non-followers from commenting on a private user post', async () => {
+      const privateUserData = {
+        name: "Private",
+        surname: "Author",
+        phoneNumber: "3334445555",
+        email: "privateauthor@test.com",
+        password: "Password123",
+        username: "privateauthor",
+        bio: "Bio",
+        description: "Desc",
+        isPrivate: true
+      };
+      const outsiderData = {
+        name: "Outside",
+        surname: "User",
+        phoneNumber: "4445556666",
+        email: "outsider@test.com",
+        password: "Password123",
+        username: "outsideruser",
+        bio: "Bio",
+        description: "Desc"
+      };
+
+      await request(app).post('/api/auth/register').send(privateUserData);
+      await request(app).post('/api/auth/register').send(outsiderData);
+
+      const outsiderLoginRes = await request(app).post('/api/auth/login').send({
+        username: outsiderData.username,
+        password: outsiderData.password
+      });
+      const outsiderCookie = outsiderLoginRes.headers['set-cookie'];
+
+      const privateUser = await User.findOne({ username: privateUserData.username });
+      const privatePost = await Post.create({
+        author: privateUser._id,
+        content: "Private post",
+        intent: "share"
+      });
+
+      const commentRes = await request(app)
+        .post(`/api/comments/${privatePost._id}`)
+        .set('Cookie', outsiderCookie)
+        .send({ content: "I should not be able to comment" });
+
+      expect(commentRes.status).toBe(403);
+      expect(commentRes.body.message).toContain('Follow them to comment');
+      expect(await Comment.countDocuments({ post: privatePost._id })).toBe(0);
+      expect(await Notification.countDocuments({ recipient: privateUser._id, type: 'comment', post: privatePost._id })).toBe(0);
     });
   });
 
