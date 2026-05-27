@@ -43,7 +43,28 @@ export default function CreatePostModal({onClose,onPostCreated}: CreateModalProp
         setIntent(parsedDraft.intent || "");
     }
 }, []);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!content.trim() && !intent) return;
 
+            const draftData = {
+                intent,
+                content,
+                savedAt: new Date().toISOString(),
+            };
+
+            localStorage.setItem(
+                "postDraft",
+                JSON.stringify(draftData)
+            );
+
+            setLastSaved(new Date());
+            setAutoSaveStatus("Draft auto-saved");
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [content, intent]);
+    
     const handleClose = () => {
         setVisible(false);
         setTimeout(onClose, 200);
