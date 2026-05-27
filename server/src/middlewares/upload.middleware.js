@@ -7,11 +7,19 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}${ext}`);
   },
 });
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+]);
+
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) {
+  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed"), false);
+    cb(new Error("Only JPEG, PNG, GIF, WebP, and AVIF images are allowed"), false);
   }
 };
 const upload = multer({
