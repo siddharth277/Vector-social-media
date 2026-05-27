@@ -205,4 +205,46 @@ describe('User Search and Suggestions Endpoints', () => {
       expect(suggestedBob.isRequestedByCurrentUser).toBe(true);
     });
   });
+
+  describe('GET /api/users/all', () => {
+    it('should return 401 if unauthorized', async () => {
+      const response = await request(app).get('/api/users/all');
+      expect(response.status).toBe(401);
+    });
+
+    it('should return all users excluding self', async () => {
+      const response = await request(app)
+        .get('/api/users/all')
+        .set('Cookie', `token=${token1}`);
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      
+      const usernames = response.body.users.map(u => u.username);
+      expect(usernames).not.toContain('alicesmith'); // self
+      expect(usernames).toContain('bobjones');
+      expect(usernames).toContain('charlieb');
+      expect(usernames).toContain('alicew');
+    });
+
+    it('should exclude blocked users and users who blocked the requester', async () => {
+      // User1 blocks User2 (Bob)
+      await User.findByIdAndUpdate(user1._id, { $addToSet: { blockedUsers: user2._id } });
+      // User3 (Charlie) blocks User1
+      await User.findByIdAndUpdate(user3._id, { $addToSet: { blockedUsers: user1._id } });
+
+      const response = await request(app)
+        .get('/api/users/all')
+        .set('Cookie', `token=${token1}`);
+      
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+
+      const usernames = response.body.users.map(u => u.username);
+      expect(usernames).not.toContain('alicesmith'); // self
+      expect(usernames).not.toContain('bobjones');   // blocked by requester
+      expect(usernames).not.toContain('charlieb');   // requester blocked by them
+      expect(usernames).toContain('alicew');         // not blocked
+    });
+  });
 });
