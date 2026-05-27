@@ -230,10 +230,17 @@ export const toggleFollowUser = async (req, res) => {
                 { $pull: { following: targetUserId }, $inc: { followingCount: -1 } }
             );
             if (result.modifiedCount > 0) {
-                await User.updateOne(
+                const targetResult = await User.updateOne(
                     { _id: targetUserId, followers: currentUserId },
                     { $pull: { followers: currentUserId }, $inc: { followersCount: -1 } }
                 );
+                if (targetResult.modifiedCount === 0) {
+                    // Rollback: restore current user's following state
+                    await User.updateOne(
+                        { _id: currentUserId },
+                        { $addToSet: { following: targetUserId }, $inc: { followingCount: 1 } }
+                    );
+                }
             }
             return res.json({
                 followed: false
