@@ -176,7 +176,7 @@ export default function NotificationPanel({ search = "" }: Props) {
     try {
       setFollowLoading((prev) => ({ ...prev, [senderId]: true }));
       await axios.put(
-        `${BACKEND_URL}/api/users/${senderId}/accept`,
+        `${BACKEND_URL}/api/users/${senderId}/accept-request`,
         {},
         { withCredentials: true }
       );
@@ -208,7 +208,7 @@ export default function NotificationPanel({ search = "" }: Props) {
     try {
       setFollowLoading((prev) => ({ ...prev, [senderId]: true }));
       await axios.put(
-        `${BACKEND_URL}/api/users/${senderId}/reject`,
+        `${BACKEND_URL}/api/users/${senderId}/reject-request`,
         {},
         { withCredentials: true }
       );
