@@ -33,16 +33,28 @@ export default function CreatePostModal({onClose,onPostCreated}: CreateModalProp
 
     const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
     const MAX_CHARS = 500;
+
     useEffect(() => {
-    const savedDraft = localStorage.getItem("postDraft");
+        const savedDraft = localStorage.getItem("postDraft");
 
-    if (savedDraft) {
-        const parsedDraft = JSON.parse(savedDraft);
+        if (savedDraft) {
+            const parsedDraft = JSON.parse(savedDraft);
 
-        setContent(parsedDraft.content || "");
-        setIntent(parsedDraft.intent || "");
-    }
-}, []);
+            const shouldRestore = window.confirm(
+                "You have a saved draft. Restore it?"
+            );
+
+            if (shouldRestore) {
+                setContent(parsedDraft.content || "");
+                setIntent(parsedDraft.intent || "");
+
+                if (parsedDraft.savedAt) {
+                    setLastSaved(new Date(parsedDraft.savedAt));
+                }
+            }
+        }
+    }, []);
+    
     useEffect(() => {
         const interval = setInterval(() => {
             if (!content.trim() && !intent) return;
