@@ -167,6 +167,8 @@ Useful manual checks:
 
 Please make your pull request easy to review.
 
+- If you are opening a PR for an issue, you must be assigned to that issue before opening the PR.
+- PRs opened for issues you are not assigned to, or opened before you are assigned, will be closed directly.
 - Use a clear title.
 - Link the related issue if there is one.
 - Describe the problem and the solution.
