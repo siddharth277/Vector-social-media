@@ -59,7 +59,8 @@ describe('Feed component – fresh post prioritization', () => {
     const feedPosts = [
       buildPost('f1', {createdAt: new Date(now - 2*60*1000).toISOString()}), 
       buildPost('f2', {createdAt: new Date(now - 5*60*1000).toISOString()}), 
-      buildPost('f3', {createdAt: new Date(now - 15*60*1000).toISOString()})];
+      buildPost('t2', {createdAt: new Date(now - 15*60*1000).toISOString()}),
+      buildPost('f3', {createdAt: new Date(now - 20*60*1000).toISOString()})];
     const page2Posts = [buildPost('t3'), buildPost('p1')];
 
     // Mock axios.get based on request URL
@@ -108,7 +109,7 @@ describe('Feed component – fresh post prioritization', () => {
       expect(capturedPosts.length).toBeGreaterThan(0);
     });
 
-    // Verify the first three posts are the top‑weekly ones in order and no duplicates exist yet
+    // Verify fresh contiguous posts stay above trending and duplicate posts are removed
     expect(capturedPosts.map(p => p._id)).toEqual(['f1', 'f2', 't1','t2','t3','f3']);
     expect(new Set(capturedPosts.map(p => p._id)).size).toBe(capturedPosts.length);
 
@@ -117,13 +118,11 @@ describe('Feed component – fresh post prioritization', () => {
 
     // Wait for pagination to complete and posts to update
     await waitFor(() => {
-      // 3 top + 2 unique from page 1 + 1 new from page 2 = 6
-      expect(capturedPosts.length).toBe(7);
-    });
+     // 2 boosted fresh posts + 3 deduped trending posts + 1 normal feed post + 1 paginated post = 7
+     expect(capturedPosts.length).toBe(7);
+  });
 
-    // Order should still start with the top weekly posts
-    expect(capturedPosts.slice(0, 5).map(p => p._id)).toEqual(['f1', 'f2', 't1','t2','t3']);
-    // The final post should be the new page‑2 post that wasn't a duplicate
-    expect(capturedPosts[capturedPosts.length - 1]._id).toBe('p1');
+    // Fresh posts should remain above trending after pagination
+    expect(capturedPosts.map(p => p._id)).toEqual(['f1', 'f2', 't1','t2','t3','f3','p1']);
   });
 });
