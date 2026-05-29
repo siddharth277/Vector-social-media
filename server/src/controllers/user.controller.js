@@ -466,13 +466,32 @@ export const getUserProfile = async (req, res) => {
 
 export const getFollowers = async (req, res) => {
     try {
-        const targetUser = await User.findById(req.params.id);
+        const targetUser = await User.findById(req.params.id).select("isPrivate blockedUsers");
         if (!targetUser) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const isSelf = req.user.id === req.params.id;
-        const isFollower = await Follow.exists({ follower: req.user.id, following: req.params.id, status: "accepted" });
+        const requesterId = req.user.id;
+
+        // Enforce block restrictions consistently with getUserProfile.
+        // A blocked user must not be able to enumerate the target's social graph.
+        const isBlockedByTarget = targetUser.blockedUsers?.some(
+            (id) => id.toString() === requesterId
+        );
+        if (isBlockedByTarget) {
+            return res.status(403).json({ message: "You are not allowed to view this profile." });
+        }
+
+        const requester = await User.findById(requesterId).select("blockedUsers").lean();
+        const hasBlockedTarget = requester?.blockedUsers?.some(
+            (id) => id.toString() === req.params.id
+        );
+        if (hasBlockedTarget) {
+            return res.status(403).json({ message: "You are not allowed to view this profile." });
+        }
+
+        const isSelf = requesterId === req.params.id;
+        const isFollower = await Follow.exists({ follower: requesterId, following: req.params.id, status: "accepted" });
 
         if (targetUser.isPrivate && !isSelf && !isFollower) {
             return res.status(403).json({ message: "This account is private. Follow to see their followers." });
@@ -487,13 +506,32 @@ export const getFollowers = async (req, res) => {
 
 export const getFollowing = async (req, res) => {
     try {
-        const targetUser = await User.findById(req.params.id);
+        const targetUser = await User.findById(req.params.id).select("isPrivate blockedUsers");
         if (!targetUser) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const isSelf = req.user.id === req.params.id;
-        const isFollower = await Follow.exists({ follower: req.user.id, following: req.params.id, status: "accepted" });
+        const requesterId = req.user.id;
+
+        // Enforce block restrictions consistently with getUserProfile.
+        // A blocked user must not be able to enumerate the target's social graph.
+        const isBlockedByTarget = targetUser.blockedUsers?.some(
+            (id) => id.toString() === requesterId
+        );
+        if (isBlockedByTarget) {
+            return res.status(403).json({ message: "You are not allowed to view this profile." });
+        }
+
+        const requester = await User.findById(requesterId).select("blockedUsers").lean();
+        const hasBlockedTarget = requester?.blockedUsers?.some(
+            (id) => id.toString() === req.params.id
+        );
+        if (hasBlockedTarget) {
+            return res.status(403).json({ message: "You are not allowed to view this profile." });
+        }
+
+        const isSelf = requesterId === req.params.id;
+        const isFollower = await Follow.exists({ follower: requesterId, following: req.params.id, status: "accepted" });
 
         if (targetUser.isPrivate && !isSelf && !isFollower) {
             return res.status(403).json({ message: "This account is private. Follow to see who they follow." });
