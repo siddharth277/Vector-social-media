@@ -797,19 +797,26 @@ export const getTopPostsOfMonth = async (req, res) => {
 export const incrementShare = async (req, res) => {
     try {
         const postId = req.params.id;
-        
+        const userId = req.user.id || req.user._id;
+
         if (!mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).json({ success: false, message: "Invalid post ID format" });
         }
 
-        const post = await Post.findByIdAndUpdate(
-            postId,
-            { $inc: { sharesCount: 1 } },
+        const post = await Post.findOneAndUpdate(
+            { _id: postId, sharedBy: { $ne: userId } },
+            { $addToSet: { sharedBy: userId }, $inc: { sharesCount: 1 } },
             { new: true }
         );
+
         if (!post) {
-            return res.status(404).json({ success: false, message: "Post not found" });
+            const exists = await Post.exists({ _id: postId });
+            if (!exists) {
+                return res.status(404).json({ success: false, message: "Post not found" });
+            }
+            return res.status(409).json({ success: false, message: "Already shared" });
         }
+
         res.json({
             success: true,
             sharesCount: post.sharesCount,
