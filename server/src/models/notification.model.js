@@ -13,7 +13,17 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["follow", "like", "comment", "message", "follow_request", "follow_request_accepted", "post_removed_reported", "comment_removed_reported"],
+      enum: [
+        "follow",
+        "like",
+        "comment",
+        "mention",          // @username mention in a post or comment
+        "message",
+        "follow_request",
+        "follow_request_accepted",
+        "post_removed_reported",
+        "comment_removed_reported",
+      ],
       required: true,
     },
     post: {
