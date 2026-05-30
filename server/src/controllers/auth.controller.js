@@ -4,6 +4,7 @@ import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema 
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import jwt from "jsonwebtoken";
 import { generateToken, getCookieOptions } from "../utils/generateToken.js";
 
 const sendResetEmail = async (email, token) => {
@@ -213,6 +214,17 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
+        const token = req.cookies?.token;
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                if (decoded?.id) {
+                    await User.updateOne({ _id: decoded.id }, { $inc: { tokenVersion: 1 } });
+                }
+            } catch {
+                // Ignore invalid/expired tokens — still clear cookie below.
+            }
+        }
         res.clearCookie('token', getCookieOptions());
         return res.status(200).json({
             success: true,

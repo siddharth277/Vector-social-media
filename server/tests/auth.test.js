@@ -163,5 +163,25 @@ describe('Auth Endpoints', () => {
       expect(authRequiredRes.body.success).toBe(false);
       expect(authRequiredRes.body.message).toContain("Token invalidated due to password reset!");
     });
+
+    it('should invalidate captured token immediately after logout (tokenVersion mismatch)', async () => {
+      const beforeVersion = user.tokenVersion || 0;
+
+      const logoutRes = await request(app)
+        .post('/api/auth/logout')
+        .set('Cookie', cookie);
+
+      expect(logoutRes.status).toBe(200);
+
+      const updated = await User.findOne({ username: validUser.username });
+      expect(updated.tokenVersion).toBe(beforeVersion + 1);
+
+      const replayRes = await request(app)
+        .get('/api/auth/me')
+        .set('Cookie', cookie);
+
+      expect(replayRes.status).toBe(401);
+      expect(replayRes.body.success).toBe(false);
+    });
   });
 });
