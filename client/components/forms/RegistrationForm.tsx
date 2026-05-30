@@ -38,7 +38,14 @@ export default function RegistrationForm() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^\+?[1-9]\d{7,14}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
-
+  
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+  // Allows only digits
+  if (/^\d*$/.test(value) && value.length<=10) {
+    setPhone(value);
+  }
+}; 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -51,40 +58,15 @@ export default function RegistrationForm() {
   const nextStep = () => {
     setFormError("");
 
-    const cleanedPhone = phoneNumber.replace(/[\s-]/g, "");
+const cleanedPhone = phoneNumber.replace(/[\s-]/g, "");
 
-    if (!name.trim()) {
-      return setFormError("Enter first name");
-    }
-    if (!surname.trim()) {
-      return setFormError("Enter last name");
-    }
-    if (!email.trim()) {
-      return setFormError("Enter email");
-    }
-    if (!emailRegex.test(email.trim())) {
-      return setFormError("Please enter a valid email!");
-    }
-    if (!phoneNumber.trim()) {
-      return setFormError("Enter phone number");
-    }
-    if (!phoneRegex.test(cleanedPhone)) {
-      return setFormError("Please enter a valid phone number!");
-    }
-    if (!password.trim()) {
-      return setFormError("Enter password");
-    }
-    if (password.length < 6) {
-      return setFormError("Password must be at least 6 characters!");
-    }
-    if (!passwordRegex.test(password)) {
-      return setFormError(
-        "Password must contain at least one uppercase letter, one lowercase letter, and one number!"
-      );
-    }
-    if (password !== confirmPassword) {
-      return setFormError("Passwords do not match");
-    }
+
+if (!phoneNumber.trim()) {
+  return setFormError("Enter phone number");
+}
+if (!/^\d{10}$/.test(cleanedPhone)) {
+  return setFormError("Please enter a valid 10 digit phone number!");
+}
 
     setStep(2);
   };
@@ -101,7 +83,18 @@ export default function RegistrationForm() {
     }
     try {
       setLoading(true);
-      const { data } = await axios.post(BACKEND_URL + "/api/auth/register", { name, surname, email, phoneNumber, password, username, bio, description, isPrivate }, { withCredentials: true });
+      
+const { data } = await axios.post(BACKEND_URL + "/api/auth/register", { 
+  name, 
+  surname, 
+  email, 
+  phoneNumber,
+  password, 
+  username, 
+  bio, 
+  description, 
+  isPrivate 
+}, { withCredentials: true });
       if (!data.success) {
         setFormError(data.message || "Registration failed");
         toast.warn(data.message || "Registration failed");
@@ -166,8 +159,9 @@ export default function RegistrationForm() {
             </div>
 
             <div className="w-full">
-              <p className="form-label">Phone number</p>
-              <input type="tel" placeholder="+00 00000 00000" className="form-input" onChange={(e) => setPhone(e.target.value)} />
+ <p className="form-label">Phone number</p>
+<input type="tel"   placeholder="+00 00000 00000" className="form-input"  value={phoneNumber} onChange={handlePhoneChange} 
+/>
             </div>
           </div>
 
