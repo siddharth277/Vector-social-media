@@ -5,20 +5,9 @@ import { createClient } from "redis";
 import mongoose from "mongoose";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
+import cookie from "cookie";
 
 let io;
-
-const parseCookies = (cookieHeader) => {
-  if (!cookieHeader) return {};
-  const cookies = {};
-  cookieHeader.split(";").forEach((cookie) => {
-    const [name, ...rest] = cookie.split("=");
-    if (name) {
-      cookies[name.trim()] = rest.join("=").trim();
-    }
-  });
-  return cookies;
-};
 
 export const initSocket = async (server) => {
   io = new Server(server, {
@@ -42,24 +31,29 @@ export const initSocket = async (server) => {
     try {
       const cookieHeader = socket.handshake.headers.cookie;
       if (!cookieHeader) {
+        console.error("Socket authentication error: No cookies found in handshake");
         return next(new Error("Authentication error: No cookies found"));
       }
-      const cookies = parseCookies(cookieHeader);
+      const cookies = cookie.parse(cookieHeader);
       const token = cookies.token;
       if (!token) {
+        console.error("Socket authentication error: Token missing from cookies");
         return next(new Error("Authentication error: Token missing"));
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.id);
       if (!user) {
+        console.error(`Socket authentication error: User not found for id ${decoded.id}`);
         return next(new Error("Authentication error: User not found"));
       }
       if ((decoded.version || 0) !== (user.tokenVersion || 0)) {
+        console.error(`Socket authentication error: Token invalidated for user ${decoded.id}`);
         return next(new Error("Authentication error: Token invalidated due to password reset"));
       }
       socket.userId = decoded.id;
       next();
-    } catch {
+    } catch (err) {
+      console.error("Socket authentication error:", err.message || err);
       return next(new Error("Authentication error: Invalid or expired token"));
     }
   });
