@@ -51,6 +51,7 @@ export type Post = {
   sharesCount?: number;
   createdAt: string;
   isBookmarked?: boolean;
+  mentions?: string[]; // userIds of @mentioned users in post content
 };
 
 export type Comment = {
@@ -58,6 +59,7 @@ export type Comment = {
   author?: UserSummary;
   content: string;
   createdAt: string;
+  mentions?: string[]; // userIds of @mentioned users in comment content
 };
 
 export type Conversation = {
@@ -85,7 +87,16 @@ export type Message = {
 
 export type Notification = {
   _id: string;
-  type: "follow" | "like" | "comment" | "message" | "follow_request" | "follow_request_accepted" | "post_removed_reported" | "comment_removed_reported";
+  type:
+    | "follow"
+    | "like"
+    | "comment"
+    | "mention"                   // @username mention in a post or comment
+    | "message"
+    | "follow_request"
+    | "follow_request_accepted"
+    | "post_removed_reported"
+    | "comment_removed_reported";
   sender: UserSummary | null;
   post?: {
     _id: string;
