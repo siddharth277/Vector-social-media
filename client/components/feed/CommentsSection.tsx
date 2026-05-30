@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Image from "next/image";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAppContext } from "@/context/AppContext";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -16,6 +16,12 @@ import type { ReportReason } from "@/lib/types";
 import { reportComment } from "@/lib/reportApi";
 import Linkify from "../ui/Linkify";
 
+type MentionUser = {
+    _id: string;
+    username: string;
+    name: string;
+    avatar?: string;
+};
 
 export default function CommentsSection({ postId }: { postId: string }) {
     const { userData } = useAppContext();
@@ -34,6 +40,12 @@ export default function CommentsSection({ postId }: { postId: string }) {
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(true);
     const LIMIT = 20;
+
+    // ── Mention autocomplete state ─────────────────────────────────────────
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+    const [mentionResults, setMentionResults] = useState<MentionUser[]>([]);
+    const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // ──────────────────────────────────────────────────────────────────────
 
     function timeAgo(dateString: string) {
         const now = new Date().getTime();
@@ -89,6 +101,49 @@ export default function CommentsSection({ postId }: { postId: string }) {
         }
     };
 
+    // ── Mention handlers ───────────────────────────────────────────────────
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setText(val);
+
+        // Detect @query being typed at the cursor position
+        const cursorPos = e.target.selectionStart ?? val.length;
+        const textUpToCursor = val.slice(0, cursorPos);
+        const match = textUpToCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+        if (match) {
+            const query = match[1];
+            setMentionQuery(query);
+            if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+            mentionDebounceRef.current = setTimeout(async () => {
+                if (query.length === 0) { setMentionResults([]); return; }
+                try {
+                    // searchUsers uses `query` param (not `q`) — matches server route
+                    const { data } = await axios.get(
+                        `${BACKEND_URL}/api/users/search?query=${encodeURIComponent(query)}`,
+                        { withCredentials: true }
+                    );
+                    setMentionResults(data.users ?? []);
+                } catch {
+                    setMentionResults([]);
+                }
+            }, 250);
+        } else {
+            setMentionQuery(null);
+            setMentionResults([]);
+        }
+    };
+
+    const insertMention = (username: string) => {
+        const newText = text.replace(/@([a-zA-Z0-9_]*)$/, `@${username} `);
+        setText(newText);
+        setMentionQuery(null);
+        setMentionResults([]);
+    };
+
+    // ──────────────────────────────────────────────────────────────────────
+
     const handlePost = async () => {
         try {
             setButtonLoading(true);
@@ -103,6 +158,8 @@ export default function CommentsSection({ postId }: { postId: string }) {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        // Block Enter from submitting while the mention dropdown is open
+        if (mentionQuery !== null && mentionResults.length > 0) return;
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             if (text.trim() && !buttonLoading) {
@@ -157,14 +214,57 @@ export default function CommentsSection({ postId }: { postId: string }) {
             <p className="text-[0.8rem] font-semibold uppercase tracking-wide surface-text-muted mb-4">
                 Comments {comments.length > 0 && `· ${comments.length}`}
             </p>
+
             {userData && (
                 <div className="flex gap-2 mb-5">
-                    <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder="Write a comment.." className="form-textarea mt-0 flex-1" rows={2} />
-                    <button disabled={!text.trim() || buttonLoading} onClick={handlePost} className="w-20 md:w-25 h-9 md:h-10 cursor-pointer bg-blue-500 text-white text-sm font-medium rounded-md disabled:opacity-50 self-end">
+                    {/* Relative wrapper so the dropdown anchors to the textarea */}
+                    <div className="flex-1 relative">
+                        <textarea
+                            value={text}
+                            onChange={handleTextChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Write a comment.. (use @ to mention someone)"
+                            className="form-textarea mt-0 w-full"
+                            rows={2}
+                        />
+
+                        {/* Mention autocomplete dropdown */}
+                        {mentionQuery !== null && mentionResults.length > 0 && (
+                            <div className="absolute left-0 bottom-full mb-1 z-30 w-64 rounded-md border border-black/10 bg-white dark:bg-blue-950 dark:border-white/10 shadow-lg overflow-hidden">
+                                {mentionResults.map((u) => (
+                                    <button
+                                        key={u._id}
+                                        type="button"
+                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-left"
+                                        // onMouseDown prevents textarea blur before setText runs
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            insertMention(u.username);
+                                        }}
+                                    >
+                                        <img
+                                            src={u.avatar || "/default-avatar.png"}
+                                            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                                            alt={u.name}
+                                        />
+                                        <span className="font-medium text-foreground truncate">{u.name}</span>
+                                        <span className="text-gray-400 text-xs ml-auto flex-shrink-0">@{u.username}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <button
+                        disabled={!text.trim() || buttonLoading}
+                        onClick={handlePost}
+                        className="w-20 md:w-25 h-9 md:h-10 cursor-pointer bg-blue-500 text-white text-sm font-medium rounded-md disabled:opacity-50 self-end"
+                    >
                         Post
                     </button>
                 </div>
             )}
+
             <div className="flex flex-col">
                 {comments.length === 0 && (
                     <p className="surface-text-muted py-3 text-center text-[0.9rem]">
@@ -173,21 +273,23 @@ export default function CommentsSection({ postId }: { postId: string }) {
                 )}
 
                 {comments.map((c) => {
-                    const isOwner =
-                        String(c.author?._id) === String(userData?.id);
+                    const isOwner = String(c.author?._id) === String(userData?.id);
 
                     return (
                         <div key={c._id} className="flex gap-3 py-3 px-2 rounded-lg border-b border-border/50 last:border-b-0">
-                            <Image alt={c.author?.name || "Comment author"} src={c.author?.avatar || "/default-avatar.png"} width={36} height={36} className="h-8 w-8 md:h-9 md:w-9 object-cover rounded-full shrink-0" />
+                            <Image
+                                alt={c.author?.name || "Comment author"}
+                                src={c.author?.avatar || "/default-avatar.png"}
+                                width={36}
+                                height={36}
+                                className="h-8 w-8 md:h-9 md:w-9 object-cover rounded-full shrink-0"
+                            />
 
                             <div className="flex flex-col w-full">
-
                                 <div className="flex items-center gap-2">
                                     <p
                                         className="cursor-pointer text-[0.9rem] font-semibold text-foreground"
-                                        onClick={() =>
-                                            router.push(`/main/user/${c.author?.username}`)
-                                        }
+                                        onClick={() => router.push(`/main/user/${c.author?.username}`)}
                                     >
                                         {c.author?.name}
                                     </p>
@@ -239,6 +341,7 @@ export default function CommentsSection({ postId }: { postId: string }) {
                                     </div>
                                 </div>
 
+                                {/* Linkify renders @mentions as clickable profile links */}
                                 <div className="surface-text-muted text-[0.9rem] whitespace-pre-wrap wrap-break-word">
                                     <Linkify text={c?.content || ""} />
                                 </div>
@@ -246,7 +349,6 @@ export default function CommentsSection({ postId }: { postId: string }) {
                                 <p className="text-[0.75rem] text-gray-500 mt-1">
                                     {timeAgo(c.createdAt)}
                                 </p>
-
                             </div>
                         </div>
                     );
