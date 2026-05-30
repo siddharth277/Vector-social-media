@@ -1,19 +1,40 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 
 interface LinkifyProps {
     text: string;
 }
 
 const Linkify: React.FC<LinkifyProps> = ({ text }) => {
-    // Regex to detect URLs
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const router = useRouter();
 
-    const parts = text.split(urlRegex);
+    // Split on both URLs and @mention tokens in one pass
+    const tokenRegex = /(https?:\/\/[^\s]+|@[a-zA-Z0-9_]{3,30})/g;
+    const parts = text.split(tokenRegex);
 
     return (
         <>
             {parts.map((part, index) => {
-                if (part.match(urlRegex)) {
+
+                // ── @mention ──────────────────────────────────────────────
+                if (/^@[a-zA-Z0-9_]{3,30}$/.test(part)) {
+                    const username = part.slice(1);
+                    return (
+                        <span
+                            key={index}
+                            className="text-blue-500 hover:underline cursor-pointer font-medium"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/main/user/${username}`);
+                            }}
+                        >
+                            {part}
+                        </span>
+                    );
+                }
+
+                // ── URL ───────────────────────────────────────────────────
+                if (/^https?:\/\//.test(part)) {
                     const punctuationMatch = part.match(/[.,;:\)]+$/);
                     const trailingPunctuation = punctuationMatch ? punctuationMatch[0] : "";
                     const urlString = part.slice(0, part.length - trailingPunctuation.length);
@@ -45,6 +66,8 @@ const Linkify: React.FC<LinkifyProps> = ({ text }) => {
                         );
                     }
                 }
+
+                // ── Plain text ────────────────────────────────────────────
                 return <React.Fragment key={index}>{part}</React.Fragment>;
             })}
         </>
