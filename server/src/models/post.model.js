@@ -46,10 +46,19 @@ const postSchema = new mongoose.Schema({
     default: 0,
   },
 
+  // Existing field from repo — tracks which users shared this post
   sharedBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
   }],
+
+  // userIds of every @mentioned user in the post content
+  mentions: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
 
 }, { timestamps: true });
 
