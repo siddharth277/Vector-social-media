@@ -9,6 +9,7 @@ import { toast } from "react-toastify";
 import { getErrorMessage } from "@/lib/error";
 import {
   ArrowRight,
+  AtSign,
   Bell,
   Heart,
   MessageCircle,
@@ -282,6 +283,7 @@ export default function NotificationPanel({ search = "" }: Props) {
     follow: "follow followed",
     like: "like liked",
     comment: "comment commented",
+    mention: "mention mentioned",
     message: "message messaged",
     follow_request: "follow request requested",
     follow_request_accepted: "accepted your follow request",
@@ -296,7 +298,7 @@ export default function NotificationPanel({ search = "" }: Props) {
       id: "comment" as const,
       label: "Comments",
       Icon: MessageSquare,
-      types: ["comment"],
+      types: ["comment", "mention"],
     },
     {
       id: "follow" as const,
@@ -333,7 +335,7 @@ export default function NotificationPanel({ search = "" }: Props) {
     like: { icon: Heart, message: "No likes yet. Share something great!" },
     comment: {
       icon: MessageSquare,
-      message: "No comments on your posts yet.",
+      message: "No comments or mentions yet.",
     },
     follow: { icon: UserCheck, message: "No new follower notifications." },
     message: {
@@ -465,6 +467,10 @@ export default function NotificationPanel({ search = "" }: Props) {
                   <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                     <span className="text-red-500 text-lg">!</span>
                   </div>
+                ) : n.type === "mention" ? (
+                  <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <AtSign className="h-5 w-5 text-blue-500" />
+                  </div>
                 ) : (
                   <Image
                     alt={getSenderName(n)}
@@ -494,6 +500,7 @@ export default function NotificationPanel({ search = "" }: Props) {
                       "accepted your follow request"}
                     {n.type === "like" && "liked your post"}
                     {n.type === "comment" && "commented on your post"}
+                    {n.type === "mention" && "mentioned you"}
                     {n.type === "message" && "messaged you"}
                     {n.type === "post_removed_reported" &&
                       "Your post was removed after receiving too many reports"}
