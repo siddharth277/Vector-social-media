@@ -78,15 +78,56 @@ export const createPost = async (req, res) => {
             imagePublicId = uploadResult.public_id;
         }
 
+        // Resolve @mentions in the post content
+        let mentionedUserIds = [];
+        if (content?.trim()) {
+            const mentionRegex = /@([a-zA-Z0-9_]{3,30})/g;
+            const rawUsernames = [
+                ...new Set(
+                    [...content.matchAll(mentionRegex)].map(m => m[1].toLowerCase())
+                ),
+            ];
+            if (rawUsernames.length > 0) {
+                const mentionedUsers = await User.find(
+                    { username: { $in: rawUsernames } },
+                    { _id: 1 }
+                ).lean();
+                mentionedUserIds = mentionedUsers.map(u => u._id);
+            }
+        }
+
         const post = await Post.create({ 
             author: req.user.id, 
             authorIsPrivate: req.user.isPrivate || false,
             content: content || "", 
             intent, 
             image, 
-            imagePublicId 
+            imagePublicId,
+            mentions: mentionedUserIds,
         });
         const populatedPost = await post.populate("author", "username name surname avatar");
+
+        // Fire mention notifications — skip the post author (themselves)
+        const io = getIO();
+        for (const mentionedId of mentionedUserIds) {
+            const mentionedStr = mentionedId.toString();
+            if (mentionedStr === req.user.id) continue;
+            try {
+                const notification = await Notification.create({
+                    recipient: mentionedId,
+                    sender: req.user.id,
+                    type: "mention",
+                    post: post._id,
+                });
+                io.to(mentionedStr).emit("notification:new", {
+                    notificationId: notification._id,
+                    type: notification.type,
+                });
+            } catch (err) {
+                if (err.code !== 11000) throw err;
+            }
+        }
+
         res.status(201).json({
             success: true,
             post: populatedPost
