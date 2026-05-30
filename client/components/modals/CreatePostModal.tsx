@@ -29,6 +29,13 @@ export default function CreatePostModal({onClose,onPostCreated}: CreateModalProp
     const [autoSaveStatus, setAutoSaveStatus] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // ── Mention autocomplete state ─────────────────────────────────────────
+    type MentionUser = { _id: string; username: string; name: string; avatar?: string };
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+    const [mentionResults, setMentionResults] = useState<MentionUser[]>([]);
+    const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // ──────────────────────────────────────────────────────────────────────
+
     const router = useRouter();
 
     const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
@@ -132,6 +139,49 @@ export default function CreatePostModal({onClose,onPostCreated}: CreateModalProp
 
         processFile(files[0]);
     };
+
+    // ── Mention handlers ───────────────────────────────────────────────────
+    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        if (val.length > MAX_CHARS) {
+            toast.error("Post content cannot exceed 500 characters");
+            return;
+        }
+        setContent(val);
+
+        const cursorPos = e.target.selectionStart ?? val.length;
+        const textUpToCursor = val.slice(0, cursorPos);
+        const match = textUpToCursor.match(/@([a-zA-Z0-9_]*)$/);
+
+        if (match) {
+            const query = match[1];
+            setMentionQuery(query);
+            if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+            mentionDebounceRef.current = setTimeout(async () => {
+                if (query.length === 0) { setMentionResults([]); return; }
+                try {
+                    const { data } = await axios.get(
+                        `${BACKEND_URL}/api/users/search?query=${encodeURIComponent(query)}`,
+                        { withCredentials: true }
+                    );
+                    setMentionResults(data.users ?? []);
+                } catch {
+                    setMentionResults([]);
+                }
+            }, 250);
+        } else {
+            setMentionQuery(null);
+            setMentionResults([]);
+        }
+    };
+
+    const insertMention = (username: string) => {
+        const newText = content.replace(/@([a-zA-Z0-9_]*)$/, `@${username} `);
+        setContent(newText);
+        setMentionQuery(null);
+        setMentionResults([]);
+    };
+    // ──────────────────────────────────────────────────────────────────────
 
     const handlePost = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -261,25 +311,38 @@ export default function CreatePostModal({onClose,onPostCreated}: CreateModalProp
 
                     {/* Content Area */}
                     <div className="relative">
-                        <textarea 
+                        <textarea
                             maxLength={MAX_CHARS}
-                            placeholder="What's on your mind? Share your thoughts..." 
-                            value={content} 
-                            onChange={(e) => {
-                                const value = e.target.value;
-
-                                if (value.length <= MAX_CHARS) {
-                                    setContent(value);
-                                } else {
-                                    toast.error("Post content cannot exceed 500 characters");
-                                }
-                            }} 
+                            placeholder="What's on your mind? Share your thoughts... (use @ to mention someone)"
+                            value={content}
+                            onChange={handleContentChange}
                             className={cn(
                                 "w-full h-40 resize-none rounded-2xl p-4 outline-none transition-all duration-200",
                                 "bg-black/5 dark:bg-white/5 border-2 border-transparent focus:border-primary/30",
                                 "text-foreground placeholder:text-foreground/40 text-lg leading-relaxed"
-                            )} 
+                            )}
                         />
+
+                        {/* Mention autocomplete dropdown */}
+                        {mentionQuery !== null && mentionResults.length > 0 && (
+                            <div className="absolute left-0 bottom-full mb-1 z-30 w-64 rounded-md border border-black/10 bg-white dark:bg-blue-950 dark:border-white/10 shadow-lg overflow-hidden">
+                                {mentionResults.map((u) => (
+                                    <button
+                                        key={u._id}
+                                        type="button"
+                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-left"
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            insertMention(u.username);
+                                        }}
+                                    >
+                                        <img src={u.avatar || "/default-avatar.png"} className="w-6 h-6 rounded-full object-cover flex-shrink-0" alt={u.name} />
+                                        <span className="font-medium text-foreground truncate">{u.name}</span>
+                                        <span className="text-gray-400 text-xs ml-auto flex-shrink-0">@{u.username}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         
                     </div>
 
