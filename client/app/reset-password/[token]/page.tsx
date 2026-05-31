@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getErrorMessage } from "@/lib/error";
 
 export default function ResetPasswordPage({
     params,
@@ -43,11 +44,7 @@ export default function ResetPasswordPage({
                 toast.error(data.message);
             }
         } catch (error: unknown) {
-            if (error instanceof Error) {
-                toast.error(error.message);
-            } else {
-                toast.error("Something went wrong");
-            }
+            toast.error(getErrorMessage(error));
         } finally {
             setLoading(false);
         }

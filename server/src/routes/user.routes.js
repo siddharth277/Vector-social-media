@@ -1,6 +1,6 @@
 import express from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
-import upload from "../middlewares/upload.middleware.js";
+import { uploadImage } from "../middlewares/upload.middleware.js";
 import { getAllUsers, getFollowers, getFollowing, getUserProfile, searchUsers, toggleFollowUser, updateProfile, uploadAvatar, getSuggestedUsers, getFollowRequests, acceptFollowRequest, rejectFollowRequest, getSentFollowRequests, blockUser, unblockUser } from "../controllers/user.controller.js";
 import optionalAuth from "../middlewares/optionalAuth.middleware.js";
 
@@ -8,7 +8,7 @@ import optionalAuth from "../middlewares/optionalAuth.middleware.js";
 const userRouter = express.Router();
 
 
-userRouter.post("/avatar", authMiddleware, upload.single("avatar"), uploadAvatar);
+userRouter.post("/avatar", authMiddleware, uploadImage("avatar"), uploadAvatar);
 userRouter.put("/update-profile", authMiddleware, updateProfile);
 userRouter.put("/:id/follow", authMiddleware, toggleFollowUser);
 userRouter.put("/:id/block", authMiddleware, blockUser);

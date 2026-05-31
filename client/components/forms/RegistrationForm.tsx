@@ -9,6 +9,7 @@ import { Eye, EyeOff, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useAppContext } from "@/context/AppContext";
+import { getErrorMessage } from "@/lib/error";
 
 export default function RegistrationForm() {
   const router = useRouter();
@@ -38,6 +39,13 @@ export default function RegistrationForm() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^\+?[1-9]\d{7,14}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*$/.test(value) && value.length <= 10) {
+      setPhone(value);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,13 +118,7 @@ export default function RegistrationForm() {
       router.replace("/main");
 
     } catch (error: unknown) {
-      const message =
-        axios.isAxiosError(error)
-          ? error.response?.data?.message || error.message
-          : error instanceof Error
-            ? error.message
-            : "Something went wrong";
-
+      const message = getErrorMessage(error);
       setFormError(message);
       toast.error(message);
     } finally {
@@ -154,7 +156,13 @@ export default function RegistrationForm() {
             </div>
             <div className="w-full">
               <p className="form-label">Phone number</p>
-              <input type="tel" placeholder="+00 00000 00000" className="form-input" onChange={(e) => setPhone(e.target.value)} />
+              <input
+                type="tel"
+                placeholder="+00 00000 00000"
+                className="form-input"
+                value={phoneNumber}
+                onChange={handlePhoneChange}
+              />
             </div>
           </div>
 
