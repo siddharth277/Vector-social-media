@@ -58,6 +58,12 @@ notificationSchema.index(
   }
 );
 
+// Prevent duplicate follow-request-accepted notifications under concurrent acceptance.
+notificationSchema.index(
+  { recipient: 1, sender: 1, type: 1 },
+  { unique: true, partialFilterExpression: { type: "follow_request_accepted" } }
+);
+
 // Index for efficient notification inbox queries (filtering by recipient and sorting by newest)
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 
